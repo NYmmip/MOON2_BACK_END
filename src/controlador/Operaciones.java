@@ -33,7 +33,7 @@ public class Operaciones implements InterfaceProxy{
             if (this.itsAdmin(key) != 2) {
                 Connection connection = this.createConnection();
                 Statement statement = connection.createStatement();
-                String query = "INSERT INTO PRODUCTOS (ID,Nombre,Descripcion,Cantida,Precio,Dimensiones)" +
+                String query = "INSERT INTO PRODUCTOS (ID,Nombre,Descripcion,Cantidad,Precio,Dimensiones)" +
                         "VALUES ('" + id + "','" + nombre + "','" + descripcion + "'," + cantidad + "," + precio + ",'" + dimensiones + "')";
                 System.out.println("Inserting Row....");
                 int rows = statement.executeUpdate(query);
@@ -77,7 +77,7 @@ public class Operaciones implements InterfaceProxy{
                 System.out.println("Deleting....");
                 statement.executeUpdate(query);
                 System.out.println("Deleted");
-                query = "INSERT INTO PRODUCTOS (ID,Nombre,Descripcion,Cantida,Precio,Dimensiones)" +
+                query = "INSERT INTO PRODUCTOS (ID,Nombre,Descripcion,Cantidad,Precio,Dimensiones)" +
                         "VALUES ('" + id + "','" + nombre + "','" + descripcion + "'," + cantidad + "," + precio + ",'" + dimensiones + "')";
                 System.out.println("Inserting Row....");
                 statement.executeUpdate(query);
