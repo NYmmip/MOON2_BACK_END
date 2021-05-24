@@ -2,14 +2,21 @@ package controlador;
 
 import modelo.Producto;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
 import javax.swing.plaf.nimbus.State;
+import java.security.*;
 import java.sql.*;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.SortedMap;
 
-public class Operaciones {
+public class Operaciones implements InterfaceProxy{
     static private Operaciones operaciones = null;
+    private PrivateKey privateKey;
     //private Connection connection;
 
     public Operaciones() {}
@@ -21,42 +28,31 @@ public class Operaciones {
         return operaciones;
     }
 
-    public static void main(String[] args) throws SQLException {
-        operaciones = Operaciones.crearIFacade();
-        //operaciones.addProducto("32124","nombew","asdsaeews",53322,6734323,"3x53x23");
-
-        //String[] temp = operaciones.getProducto("123123");
-        //for (String[] c:operaciones.getAllProductos()) {
-            //for (String x:c) {
-                //.out.println(x);
-            //}
-        //}
-        //operaciones.createUser("Admin1","user2","Usuario2","312112","pass1",0);
-        //operaciones.setUser("Admin1","user1","Usuario2","312112","pass1",0);
-        System.out.println(operaciones.getAllProductos().size());
-    }
-
-    public boolean addProducto(String id, String nombre, String descripcion, int cantidad, float precio, String dimensiones) throws SQLException {
+    public int addProducto(byte[] key,String id, String nombre, String descripcion, int cantidad, float precio, String dimensiones){
         try {
-            Connection connection = this.createConnection();
-            Statement statement = connection.createStatement();
-            String query = "INSERT INTO PRODUCTOS (ID,Nombre,Descripcion,Cantida,Precio,Dimensiones)" +
-                    "VALUES ('" + id + "','" + nombre + "','" + descripcion + "'," + cantidad + "," + precio + ",'" + dimensiones + "')";
-            System.out.println("Inserting Row....");
-            int rows = statement.executeUpdate(query);
-            if (rows > 0)
-                System.out.println("Row Inserted");
-            connection.close();
-            System.out.println("Connection Closed \n");
-            return true;
-        } catch (Exception e) {
-            System.out.println("ERROR Inserting Row");
-            e.printStackTrace();
-            return false;
+            if (this.itsAdmin(key) != 2) {
+                Connection connection = this.createConnection();
+                Statement statement = connection.createStatement();
+                String query = "INSERT INTO PRODUCTOS (ID,Nombre,Descripcion,Cantida,Precio,Dimensiones)" +
+                        "VALUES ('" + id + "','" + nombre + "','" + descripcion + "'," + cantidad + "," + precio + ",'" + dimensiones + "')";
+                System.out.println("Inserting Row....");
+                int rows = statement.executeUpdate(query);
+                if (rows > 0)
+                    System.out.println("Row Inserted");
+                connection.close();
+                System.out.println("Connection Closed \n");
+                return 0;
+            } else {
+                System.out.println("This User Does not Exist");
+                return 3;
+            }
+        } catch (SQLException throwables) {
+            throwables.printStackTrace();
+            return 1;
         }
     }
 
-    public boolean setProducto(String id, String nombre, String descripcion, int cantidad, float precio, String dimensiones) {
+    public int setProducto(String id, String nombre, String descripcion, int cantidad, float precio, String dimensiones) {
 
         try {
             boolean temp = false;
@@ -69,7 +65,7 @@ public class Operaciones {
             if (resultSet.next() == false) {
                 System.out.println("No results");
                 System.out.println("Connection Closed \n");
-                return false;
+                return 1;
             } else {
                 System.out.println("Producto Found");
                 temp = true;
@@ -90,11 +86,11 @@ public class Operaciones {
 
             connection.close();
             System.out.println("Connection Closed \n");
-            return true;
+            return 0;
         } catch (Exception e) {
             System.out.println("Error Updating");
             e.printStackTrace();
-            return false;
+            return 2;
         }
     }
 
@@ -110,7 +106,7 @@ public class Operaciones {
                 System.out.println("No results");
                 System.out.println("Connection Closed \n");
                 connection.close();
-                return null;
+                return new String[1];
             } else {
                 do {
                     temp[0] = resultSet.getString("id");
@@ -132,7 +128,7 @@ public class Operaciones {
         }
     }
 
-    public boolean deleteProducto(String id) {
+    public int deleteProducto(String id) {
         try {
             boolean temp = false;
             Connection connection = this.createConnection();
@@ -145,7 +141,7 @@ public class Operaciones {
                 System.out.println("No results");
                 System.out.println("Connection Closed \n");
                 connection.close();
-                return false;
+                return 1;
             } else {
                 System.out.println("Producto Found");
                 temp = true;
@@ -159,11 +155,11 @@ public class Operaciones {
                 System.out.println("Deleted");
             }
             System.out.println("Connection Closed \n");
-            return true;
+            return 0;
         } catch (Exception e) {
             System.out.println("Error Deleting");
             e.printStackTrace();
-            return false;
+            return 2;
         }
     }
 
@@ -177,7 +173,7 @@ public class Operaciones {
             if (resultSet.next() == false) {
                 System.out.println("No results");
                 connection.close();
-                return null;
+                return temp;
             } else {
                 do {
                     temp.add(this.getProducto(resultSet.getString("id")));
@@ -187,64 +183,57 @@ public class Operaciones {
                 connection.close();
                 return temp;
             }
-        } catch (SQLException throwables) {
+        } catch (Exception e) {
             System.out.println("Error Searching all Productos");
-            throwables.printStackTrace();
+            e.printStackTrace();
             return null;
         }
     }
 
-    public String[] getUser(String adminUser, String empleadoUser){
+    public String[] getUser(byte[] key, String empleadoUser){
         try {
-            String[] temp = new String[5];
-            Connection connection = this.createConnection();
-            PreparedStatement statement = connection.prepareStatement("SELECT * FROM Users WHERE Username = ?");
-            statement.setString(1,adminUser);
-            ResultSet resultSet = statement.executeQuery();
-            if(resultSet.next()){
-                if(resultSet.getBoolean("tipo")){
-                    System.out.println("Access Granted");
-                    System.out.println("Searching User....");
-                    statement.setString(1,empleadoUser);
-                    resultSet = statement.executeQuery();
-                    if(resultSet.next()){
-                        System.out.println("User Found");
-                        temp[0] = resultSet.getString("nombre");
-                        temp[1] = resultSet.getString("documento");
-                        temp[2] = resultSet.getString("username");
-                        temp[3] = resultSet.getString("password");
-                        temp[4] = resultSet.getString("tipo");
-                    } else {
-                        System.out.println("No Results");
-                        System.out.println("Connection Closed \n");
-                        connection.close();
-                        return null;
-                    }
-                } else {
-                    System.out.println("Access Denied");
+            if(this.itsAdmin(key) == 0){
+                String[] temp = new String[5];
+                Connection connection = this.createConnection();
+                PreparedStatement statement = connection.prepareStatement("SELECT * FROM Users WHERE Username = ?");
+                ResultSet resultSet = statement.executeQuery();
+                System.out.println("Access Granted");
+                System.out.println("Searching User....");
+                statement.setString(1,empleadoUser);
+                resultSet = statement.executeQuery();
+                if(resultSet.next()){
+                    System.out.println("User Found");
+                    temp[0] = resultSet.getString("nombre");
+                    temp[1] = resultSet.getString("documento");
+                    temp[2] = resultSet.getString("username");
+                    temp[3] = resultSet.getString("password");
+                    temp[4] = resultSet.getString("tipo");
                     System.out.println("Connection Closed \n");
-                    return null;
+                    return temp;
+                } else {
+                    System.out.println("No Results");
+                    System.out.println("Connection Closed \n");
+                    connection.close();
+                    return temp = new String[1];
                 }
             } else {
                 System.out.println("Access Denied");
                 System.out.println("Connection Closed \n");
-                return null;
+                return new String[2];
             }
-            System.out.println("Connection Closed \n");
-            return temp;
-        } catch (SQLException throwables) {
+        } catch (Exception e) {
             System.out.println("Error");
-            throwables.printStackTrace();
+            e.printStackTrace();
             return null;
         }
 
     }
 
-    public boolean createUser(String adminUser, String empleadoUser, String nombre,String documento, String password, int tipo){
+    public boolean createUser(byte[] key, String empleadoUser, String nombre,String documento, String password, int tipo){
         try {
             Connection connection = this.createConnection();
             Statement statement = connection.createStatement();
-            if (this.getUser(adminUser,adminUser) != null) {
+            if (this.itsAdmin(key) == 0) {
                 String query = "INSERT INTO Users " +
                         "VALUES ('" + nombre + "','" + documento + "','" + empleadoUser + "','" + password + "'," + tipo+")";
                 System.out.println("Inserting Row....");
@@ -256,57 +245,58 @@ public class Operaciones {
             }
             return true;
         } catch (SQLException throwables) {
-            System.out.println("Error Creating User");
+            System.out.println("The ID is Already in Use");
             throwables.printStackTrace();
             return false;
         }
     }
 
-    public boolean deleteUser(String adminUser, String empleadoUser){
+    public int deleteUser(byte[] key, String empleadoUser){
         try {
-            if(this.itsAdmin(adminUser)){
+            if(this.itsAdmin(key) == 0){
                 Connection connection = this.createConnection();
                 Statement statement = connection.createStatement();
                 String query = "select count(Username) as usercount from Users";
                 ResultSet resultSet = statement.executeQuery(query);
                 resultSet.next();
                 if(resultSet.getInt("usercount")>1){
-                    if(this.getUser(adminUser,empleadoUser) != null){
+                    if(this.getUser(key,empleadoUser) != null){
                         query = "DELETE FROM Users " +
                                 "WHERE Username = '" + empleadoUser+"'";
                         System.out.println("Deleting....");
                         statement.executeUpdate(query);
                         System.out.println("Deleted");
                         connection.close();
-                        return true;
+                        return 0;
                     }else{
                         System.out.println("No results");
                         connection.close();
-                        return false;
+                        return 1;
                     }
                 }else{
                     System.out.println("Cant Delete Last User");
-                    return false;
+                    return 2;
                 }
             }
-            return false;
-        } catch (SQLException throwables) {
-            throwables.printStackTrace();
-            return false;
+            System.out.println("This User Does Can Not Do This Operation");
+            return 3;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return 4;
         }
     }
 
-    public boolean setUser(String adminUser, String empleadoUser, String nombre,String documento, String password, int tipo){
-        if(this.deleteUser(adminUser, empleadoUser)){
+    public boolean setUser(byte[] adminUser, String empleadoUser, String nombre,String documento, String password, int tipo){
+        if(this.deleteUser(adminUser, empleadoUser) == 0){
             this.createUser(adminUser, empleadoUser, nombre, documento, password, tipo);
             return true;
         }
         return false;
     }
 
-    public ArrayList<String[]> getAllUsers(String adminUser){
+    public ArrayList<String[]> getAllUsers(byte[] adminUser){
         try {
-            if(this.itsAdmin(adminUser)){
+            if(this.itsAdmin(adminUser) == 0){
                 ArrayList<String[]> temp = new ArrayList<>();
                 Connection connection = this.createConnection();
                 Statement statement = connection.createStatement();
@@ -333,11 +323,42 @@ public class Operaciones {
         }
     }
 
-    private boolean itsAdmin(String adminUser){
-        if(this.getUser(adminUser,adminUser) != null){
-            return true;
+    public boolean login(String user, String password){
+        try {
+            Connection connection = this.createConnection();
+            PreparedStatement statement = connection.prepareStatement("SELECT username FROM Users WHERE Username = ? AND Password = ?");
+            statement.setString(1,user);
+            statement.setString(2,password);
+            ResultSet resultSet = statement.executeQuery();
+            if(resultSet.next()){
+                return true;
+            }
+            return false;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
         }
-        return false;
+    }
+
+    private int itsAdmin(byte[] key){
+        try {
+            String temp = decrypt(key);
+            Connection connection = this.createConnection();
+            Statement statement = connection.createStatement();
+            ResultSet resultSet = statement.executeQuery("select Tipo from  Users where Username = '"+temp+"'");
+            if(!resultSet.next()){
+                return 2;
+            } else if(resultSet.getBoolean(1)){
+                return 0;
+            } else if (!resultSet.getBoolean(1)){
+                return 1;
+            }
+            return 2;
+        } catch (Exception e) {
+            System.out.println("Unexpected Error");
+            e.printStackTrace();
+            return 2;
+        }
     }
 
     private Connection createConnection(){
@@ -355,4 +376,18 @@ public class Operaciones {
         }
     }
 
+    @Override
+    public String performOperation() throws NoSuchAlgorithmException {
+        KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
+        keyGen.initialize(1024);
+        KeyPair pair = keyGen.generateKeyPair();
+        this.privateKey = pair.getPrivate();
+        return Base64.getEncoder().encodeToString(pair.getPublic().getEncoded());
+    }
+
+    private String decrypt(byte[] data) throws IllegalBlockSizeException, InvalidKeyException, BadPaddingException, NoSuchAlgorithmException, NoSuchPaddingException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException {
+        Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+        cipher.init(Cipher.DECRYPT_MODE, this.privateKey);
+        return new String(cipher.doFinal(data));
+    }
 }
